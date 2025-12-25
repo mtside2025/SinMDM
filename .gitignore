@@ -28,10 +28,6 @@ Thumbs.db
 # Project specific
 save/
 dataset/HumanML3D/
-dataset/mixamo/
-dataset/zoo/
-*.bvh
-*.npy
 *.log
 *.pt
 *.pth

@@ -5,7 +5,7 @@ import json
 import sys
 
 
-def parse_and_load_from_model(parser):
+def parse_and_load_from_model(parser, verbose=False):
     # args according to the loaded model
     # do not try to specify them from cmd line since they will be overwritten
     add_data_options(parser)
@@ -20,6 +20,13 @@ def parse_and_load_from_model(parser):
     # load args from model
     model_path = get_model_path_from_args()
     args_path = os.path.join(os.path.dirname(model_path), 'args.json')
+    
+    # Debug output
+    if verbose:
+        print(f'[DEBUG] model_path from args: {model_path}')
+        print(f'[DEBUG] args_path: {args_path}')
+        print(f'[DEBUG] args_path exists: {os.path.exists(args_path)}')
+    
     assert os.path.exists(args_path), f'Arguments json file {args_path} was not found!'
     with open(args_path, 'r') as fr:
         model_args = json.load(fr)
@@ -48,7 +55,7 @@ def get_args_per_group_name(parser, args, group_name):
 def get_model_path_from_args():
     try:
         dummy_parser = ArgumentParser()
-        dummy_parser.add_argument('model_path')
+        dummy_parser.add_argument('--model_path', required=True)
         dummy_args, _ = dummy_parser.parse_known_args()
         return dummy_args.model_path
     except:
@@ -271,13 +278,13 @@ def generate_args():
     return parse_and_load_from_model(parser)
 
 
-def edit_args():
+def edit_args(verbose=False):
     parser = ArgumentParser()
     # args specified by the user: (all other will be loaded from the model)
     add_base_options(parser)
     add_sampling_options(parser)
     add_edit_options(parser)
-    return parse_and_load_from_model(parser)
+    return parse_and_load_from_model(parser, verbose=verbose)
 
 
 def evaluation_parser():
