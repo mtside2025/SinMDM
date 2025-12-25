@@ -17,7 +17,6 @@ from data_utils.humanml.scripts.motion_process import recover_from_ric
 from data_utils.humanml import humanml_utils
 from data_utils.mixamo import mixamo_utils
 import data_utils.humanml.utils.paramUtil as paramUtil
-from data_utils.humanml.utils.plot_script import plot_3d_motion
 from sample.generate import load_dataset
 import shutil
 from data_utils.mixamo.motion import MotionData
@@ -32,7 +31,7 @@ from Motion.Quaternions import Quaternions
 
 
 def main():
-    args = edit_args()
+    args = edit_args(verbose=True)
     fixseed(args.seed)
     out_path = args.output_dir
     name = os.path.basename(os.path.dirname(args.model_path))
@@ -233,9 +232,22 @@ def main():
     # Recover XYZ *positions* from HumanML3D vector representation
     if model.data_rep == 'hml_vec':
         n_joints = 22 if sample.shape[1] == 263 else 21
-        sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float()
+        sample_hml_format = sample.cpu().permute(0, 2, 3, 1).float()  # Keep HumanML format for BVH conversion
+        sample = data.dataset.t2m_dataset.inv_transform(sample_hml_format).float()
         sample = recover_from_ric(sample, n_joints)
         sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
+        
+        # Convert HumanML format to BVH if input was BVH
+        if args.sin_path.lower().endswith('.bvh'):
+            print("Converting HumanML output back to BVH format...")
+            from data_utils.humanml import humanml_utils
+            for i in range(sample_hml_format.shape[0]):
+                bvh_path = os.path.join(out_path, f'sample{i:02d}.bvh')
+                # Get the denormalized HumanML data
+                hml_data = data.dataset.t2m_dataset.inv_transform(sample_hml_format[i]).squeeze().cpu().numpy()  # (n_frames, 263)
+                # Convert to BVH
+                humanml_utils.humanml_to_bvh(hml_data, bvh_path, args.sin_path, fps=20)
+                print(f"  Saved: {bvh_path}")
     elif model.data_rep in ['mixamo_vec', 'bvh_general_vec']:
         sample = sample.cpu().numpy()
         sample = sample.transpose(0, 3, 1,
@@ -346,13 +358,8 @@ def main():
         caption = 'Input Motion'
         length = model_kwargs['y']['lengths'][sample_i]
         motion = input_motions[sample_i].transpose(2, 0, 1)[:length]
-        save_file = 'input_motion{:02d}.mp4'.format(sample_i)
-        animation_save_path = os.path.join(out_path, save_file)
-        rep_files = [animation_save_path]
-        print(f'[({sample_i}) "{caption}" | -> {save_file}]')
-        plot_3d_motion(animation_save_path, skeleton, motion, title=caption,
-                       dataset=args.dataset, fps=fps, vis_mode='gt',
-                       gt_frames=gt_frames_per_sample.get(sample_i, []))
+        print(f'[({sample_i}) "{caption}" | Input motion length: {length}]')
+        
         caption = all_text[0*args.batch_size + sample_i]
         if caption == '':
             caption = 'Edit [{}] unconditioned'.format(args.edit_mode)
@@ -360,21 +367,7 @@ def main():
             caption = 'Edit: {}'.format(args.edit_mode)
         length = all_lengths[0 *args.batch_size + sample_i]
         motion = all_motions[0 *args.batch_size + sample_i].transpose(2, 0, 1)[:length]
-        save_file = 'sample{:02d}_rep{:02d}.mp4'.format(sample_i, 0)
-        animation_save_path = os.path.join(out_path, save_file)
-        rep_files.append(animation_save_path)
-        print(f'[({sample_i}) "{caption}" | Rep #{0} | -> {save_file}]')
-        plot_3d_motion(animation_save_path, skeleton, motion, title=caption,
-                       dataset=args.dataset, fps=fps, vis_mode=args.edit_mode,
-                       gt_frames=gt_frames_per_sample.get(sample_i, []))
-        # Credit for visualization: https://github.com/EricGuo5513/text-to-motion
-
-        all_rep_save_file = os.path.join(out_path, 'sample{:02d}.mp4'.format(sample_i))
-        ffmpeg_rep_files = [f' -i {f} ' for f in rep_files]
-        hstack_args = f' -filter_complex hstack=inputs={1+1}'
-        ffmpeg_rep_cmd = f'ffmpeg -y -loglevel warning ' + ''.join(ffmpeg_rep_files) + f'{hstack_args} {all_rep_save_file}'
-        os.system(ffmpeg_rep_cmd)
-        print(f'[({sample_i}) "{caption}" | all repetitions | -> {all_rep_save_file}]')
+        print(f'[({sample_i}) "{caption}" | Generated motion length: {length}]')
 
     abs_path = os.path.abspath(out_path)
     print(f'[Done] Results are at [{abs_path}]')

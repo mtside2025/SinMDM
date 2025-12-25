@@ -129,10 +129,23 @@ def main(args=None):
     # Recover XYZ *positions* from HumanML3D vector representation
     if model.data_rep == 'hml_vec':
         n_joints = 22
-        sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float()
+        sample_hml_format = sample.cpu().permute(0, 2, 3, 1).float()  # Keep HumanML format for BVH conversion
+        sample = data.dataset.t2m_dataset.inv_transform(sample_hml_format).float()
         sample = recover_from_ric(sample, n_joints)
         sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
         skeleton = paramUtil.t2m_kinematic_chain
+        
+        # Convert HumanML format to BVH if input was BVH
+        if args.sin_path.lower().endswith('.bvh'):
+            print("Converting HumanML output back to BVH format...")
+            from data_utils.humanml import humanml_utils
+            for i in range(sample_hml_format.shape[0]):
+                bvh_path = os.path.join(out_path, f'sample{i:02d}.bvh')
+                # Get the denormalized HumanML data
+                hml_data = data.dataset.t2m_dataset.inv_transform(sample_hml_format[i]).squeeze().cpu().numpy()  # (n_frames, 263)
+                # Convert to BVH
+                humanml_utils.humanml_to_bvh(hml_data, bvh_path, args.sin_path, fps=20)
+                print(f"  Saved: {bvh_path}")
     # Recover XYZ *positions* from zoo vector representation
     elif model.data_rep in ['mixamo_vec', 'bvh_general_vec']:
         sample = sample.cpu().numpy()

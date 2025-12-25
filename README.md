@@ -337,6 +337,58 @@ Our code partially uses each of the following works. We thank the authors of the
 
 [MDM](https://github.com/GuyTevet/motion-diffusion-model), [QnA](https://github.com/moabarar/qna), [Ganimator](https://github.com/PeizhuoLi/ganimator), [Guided Diffusion](https://github.com/openai/guided-diffusion), [A Deep Learning Framework For Character Motion Synthesis and Editing](http://theorangeduck.com/page/deep-learning-framework-character-motion-synthesis-and-editing).
 
+## Cross-Dataset Support: Using Mixamo Data with HumanML Models
+
+This implementation supports using BVH files (such as Mixamo data) with HumanML models. The conversion between formats is handled automatically.
+
+### Using BVH Input with HumanML Models
+
+You can now directly use `.bvh` files as input when working with HumanML models:
+
+```shell
+# Edit a Mixamo BVH file using a HumanML model
+python sample/edit.py \
+    --dataset humanml \
+    --model_path ./save/humanml/0000/model000000.pt \
+    --sin_path dataset/mixamo/0000_Breakdance_Freezes.bvh \
+    --edit_mode upper_body
+
+# Generate motion using a HumanML model with BVH reference
+python sample/generate.py \
+    --dataset humanml \
+    --model_path ./save/humanml/0000/model000000.pt \
+    --sin_path dataset/mixamo/0000_Breakdance_Freezes.bvh
+```
+
+### How It Works
+
+1. **Input**: When a `.bvh` file is provided with `--dataset humanml`, it is automatically converted to HumanML3D format (263-dimensional vector)
+2. **Processing**: The HumanML model processes the motion in its native format
+3. **Output**: The result is automatically converted back to BVH format (`.bvh` files in the output directory)
+
+### Features
+
+- **Automatic Format Conversion**: BVH ↔ HumanML format conversion is seamless
+- **Unified BVH Output**: All outputs are saved as BVH files for easy visualization and further processing
+- **No Manual Preprocessing**: No need to manually convert files before use
+- **Skeleton-Aware**: The conversion preserves skeletal structure using the reference BVH
+
+### Technical Details
+
+The conversion handles:
+- Root rotation and translation velocities
+- Joint rotations (6D representation)
+- Rotation-invariant coordinates (RIC)
+- Local joint velocities
+- Foot contact detection
+- FPS resampling (converts to/from 20 FPS for HumanML)
+
+### Notes
+
+- The conversion is approximate due to differences in skeleton structures between Mixamo and HumanML3D
+- Results may vary depending on the complexity of the motion and skeleton differences
+- Output BVH files use the same skeleton structure as the input reference BVH
+
 ## License
 This code is distributed under the [MIT LICENSE](LICENSE).
 
