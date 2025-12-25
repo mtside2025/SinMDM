@@ -41,7 +41,3 @@ results/
 # Temporary files
 *.tmp
 .cache/
-
-# User scripts (keep local only)
-edit.sh
-train.sh
